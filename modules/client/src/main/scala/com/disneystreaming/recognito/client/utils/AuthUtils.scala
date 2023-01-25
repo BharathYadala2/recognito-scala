@@ -1,9 +1,9 @@
 package com.disneystreaming.recognito.client.utils
 
-import AuthEntities._
+import com.disneystreaming.recognito.client.models.AuthEntities._
 import cats.effect._
-import com.disneystreaming.recognito.client.models.RecognitoCreds
-import com.disneystreaming.recognito.client.utils.AuthEntities.{AuthRequest, AuthResponse, AuthenticationResult, TokenRequest, TokenResponse}
+import com.disneystreaming.recognito.client.models.RecognitoCredentials
+import com.disneystreaming.recognito.client.models.AuthEntities.{AuthRequest, AuthResponse, AuthenticationResult, TokenRequest, TokenResponse}
 import io.circe.generic.auto._
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.circe._
@@ -54,7 +54,7 @@ object AuthUtils {
     client.expect(request)(jsonOf[IO, TokenResponse])
   }
 
-  def generateToken(creds: RecognitoCreds): IO[AuthenticationResult] =
+  def generateToken(creds: RecognitoCredentials): IO[AuthenticationResult] =
     EmberClientBuilder.default[IO].build.use { implicit client =>
       val authRequest = AuthRequest(
         AuthParameters = AuthParameters(creds.username),
