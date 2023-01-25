@@ -1,6 +1,6 @@
 package com.disneystreaming.recognito.client.middleware
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.effect.unsafe.implicits.global
 import com.disneystreaming.recognito.client.models.AuthEntities.AuthenticationResult
 import com.disneystreaming.recognito.client.models.RecognitoCredentials
@@ -11,18 +11,22 @@ import org.http4s.{AuthScheme, Credentials, Request}
 
 object AuthMiddleware {
 
-  private val tokenCache = IO.ref(Map.empty[String, AuthenticationResult])
-
-  def apply(request: Request[IO], credentials: RecognitoCredentials)(client: Client[IO]): IO[Request[IO]] =
+  def apply(
+             request: Request[IO],
+             credentials: RecognitoCredentials
+           )(
+             ref: Ref[IO, Map[String, AuthenticationResult]],
+             client: Client[IO]
+           ): IO[Request[IO]] =
     for {
-      ref <- tokenCache
       cachedValue <- ref.get.map(_.get(credentials.username))
-      token <- cachedValue.map(IO.pure).getOrElse {
-        AuthUtils.generateToken(credentials)
-          .map { authResult =>
-            ref.update(_ + (credentials.username -> authResult))
-            authResult
-          }
+      token <- cachedValue match {
+        case Some(value) => IO.pure(value)
+        case None =>
+          for {
+            generated <- AuthUtils.generateToken(credentials)
+            newToken <- ref.modify(x => (x + (credentials.username -> generated), generated))
+          } yield newToken
       }
     } yield request.putHeaders(Authorization(Credentials.Token(AuthScheme.Bearer, token.IdToken)))
 
