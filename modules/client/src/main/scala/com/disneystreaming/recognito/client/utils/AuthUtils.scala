@@ -18,7 +18,7 @@ object AuthUtils {
   private val tokenRequestEncoder = jsonEncoderOf[IO, TokenRequest]
 
   private def getCognitoUri(region: String): Uri =
-    uri"https://cognito-idp.$region.amazonaws.com"
+    Uri.unsafeFromString(s"https://cognito-idp.$region.amazonaws.com")
 
   private val authResponseHeader: Headers =
     Headers(
