@@ -1,7 +1,6 @@
 package com.disneystreaming.recognito.client.middleware
 
 import cats.effect.{IO, Ref}
-import cats.effect.unsafe.implicits.global
 import com.disneystreaming.recognito.client.models.AuthEntities.AuthenticationResult
 import com.disneystreaming.recognito.client.models.RecognitoCredentials
 import com.disneystreaming.recognito.client.utils.AuthUtils
