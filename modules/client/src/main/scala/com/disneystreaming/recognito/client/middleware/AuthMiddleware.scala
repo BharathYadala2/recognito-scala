@@ -8,25 +8,27 @@ import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.http4s.{AuthScheme, Credentials, Request}
 
-object AuthMiddleware {
+class AuthMiddleware(credentials: RecognitoCredentials, ref: Ref[IO, Option[AuthenticationResult]], client: Client[IO]) {
 
-  def apply(
-             request: Request[IO],
-             credentials: RecognitoCredentials
-           )(
-             ref: Ref[IO, Map[String, AuthenticationResult]],
-             client: Client[IO]
-           ): IO[Request[IO]] =
+  def appendTo(request: Request[IO]): IO[Request[IO]] =
     for {
-      cachedValue <- ref.get.map(_.get(credentials.username))
+      cachedValue <- ref.get
       token <- cachedValue match {
-        case Some(value) => IO.pure(value)
-        case None =>
+        case Some(value) if !value.hasExpired =>
+          IO.pure(value)
+        case _ =>
           for {
             generated <- AuthUtils.generateToken(credentials)(client)
-            newToken <- ref.modify(x => (x + (credentials.username -> generated), generated))
+            newToken <- ref.modify(_ => (Some(generated), generated))
           } yield newToken
       }
     } yield request.putHeaders(Authorization(Credentials.Token(AuthScheme.Bearer, token.IdToken)))
+
+}
+
+object AuthMiddleware {
+
+  def apply(credentials: RecognitoCredentials)(client: Client[IO]): IO[AuthMiddleware] =
+    IO.ref(Option.empty[AuthenticationResult]).map(ref => new AuthMiddleware(credentials, ref, client))
 
 }

@@ -16,6 +16,8 @@ object AuthEntities {
 
   case class AuthenticationResult(AccessToken: String, ExpiresIn: Int, IdToken: String, RefreshToken: String, TokenType: String) {
     val expirationAt: Long = System.currentTimeMillis() + (ExpiresIn * 60 * 60 * 1000)
+
+    def hasExpired: Boolean = expirationAt > System.currentTimeMillis()
   }
 
   case class TokenResponse(AuthenticationResult: AuthenticationResult)
