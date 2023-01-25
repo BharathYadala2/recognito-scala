@@ -6,7 +6,6 @@ import com.disneystreaming.recognito.client.models.RecognitoCredentials
 import io.circe.generic.auto._
 import org.http4s.circe._
 import org.http4s.client.Client
-import org.http4s.syntax.all._
 import org.http4s.{Entity, Headers, Method, Request, Uri}
 
 object AuthUtils {
@@ -17,8 +16,11 @@ object AuthUtils {
   private val authRequestEncoder = jsonEncoderOf[IO, AuthRequest]
   private val tokenRequestEncoder = jsonEncoderOf[IO, TokenRequest]
 
-  private def getCognitoUri(region: String): Uri =
-    Uri.unsafeFromString(s"https://cognito-idp.$region.amazonaws.com")
+  private def getCognitoUri(region: String): IO[Uri] =
+    Uri.fromString(s"https://cognito-idp.$region.amazonaws.com") match {
+      case Left(value) => IO.raiseError(new RuntimeException(value))
+      case Right(value) => IO.pure(value)
+    }
 
   private val authResponseHeader: Headers =
     Headers(
@@ -55,8 +57,6 @@ object AuthUtils {
   }
 
   def generateToken(credentials: RecognitoCredentials)(client: Client[IO]): IO[AuthenticationResult] = {
-    val cognitoUri = getCognitoUri(credentials.region)
-
     val authRequest = AuthRequest(
       AuthParameters = AuthParameters(credentials.username),
       AuthFlow = authflow,
@@ -72,6 +72,7 @@ object AuthUtils {
     )
 
     for {
+      cognitoUri <- getCognitoUri(credentials.region)
       authResponse <- getAuthResponse(authRequestEncoder.toEntity(authRequest), cognitoUri)(client)
       updatedTokenReq = tokenRequest.copy(Session = Some(authResponse.Session))
       tokenResponse <- getTokenResponse(tokenRequestEncoder.toEntity(updatedTokenReq), cognitoUri)(client)
