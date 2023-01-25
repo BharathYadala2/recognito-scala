@@ -23,7 +23,7 @@ object AuthMiddleware {
         case Some(value) => IO.pure(value)
         case None =>
           for {
-            generated <- AuthUtils.generateToken(credentials)
+            generated <- AuthUtils.generateToken(credentials)(client)
             newToken <- ref.modify(x => (x + (credentials.username -> generated), generated))
           } yield newToken
       }

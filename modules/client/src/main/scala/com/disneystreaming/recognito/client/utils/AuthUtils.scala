@@ -1,11 +1,9 @@
 package com.disneystreaming.recognito.client.utils
 
-import com.disneystreaming.recognito.client.models.AuthEntities._
 import cats.effect._
+import com.disneystreaming.recognito.client.models.AuthEntities._
 import com.disneystreaming.recognito.client.models.RecognitoCredentials
-import com.disneystreaming.recognito.client.models.AuthEntities.{AuthRequest, AuthResponse, AuthenticationResult, TokenRequest, TokenResponse}
 import io.circe.generic.auto._
-import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.circe._
 import org.http4s.client.Client
 import org.http4s.syntax.all._
@@ -32,7 +30,7 @@ object AuthUtils {
       "Content-Type" -> "application/x-amz-json-1.1"
     )
 
-  private def getAuthResponse(authRequest: Entity[IO])(implicit client: Client[IO]): IO[AuthResponse] = {
+  private def getAuthResponse(authRequest: Entity[IO])(client: Client[IO]): IO[AuthResponse] = {
     val request = Request[IO](
       method = Method.POST,
       uri = cognitoUrl,
@@ -43,7 +41,7 @@ object AuthUtils {
     client.expect(request)(jsonOf[IO, AuthResponse])
   }
 
-  private def getTokenResponse(tokenRequest: Entity[IO])(implicit client: Client[IO]): IO[TokenResponse] = {
+  private def getTokenResponse(tokenRequest: Entity[IO])(client: Client[IO]): IO[TokenResponse] = {
     val request = Request[IO](
       method = Method.POST,
       uri = cognitoUrl,
@@ -54,27 +52,26 @@ object AuthUtils {
     client.expect(request)(jsonOf[IO, TokenResponse])
   }
 
-  def generateToken(creds: RecognitoCredentials): IO[AuthenticationResult] =
-    EmberClientBuilder.default[IO].build.use { implicit client =>
-      val authRequest = AuthRequest(
-        AuthParameters = AuthParameters(creds.username),
-        AuthFlow = authflow,
-        ClientId = creds.clientId
-      )
+  def generateToken(creds: RecognitoCredentials)(client: Client[IO]): IO[AuthenticationResult] = {
+    val authRequest = AuthRequest(
+      AuthParameters = AuthParameters(creds.username),
+      AuthFlow = authflow,
+      ClientId = creds.clientId
+    )
 
-      val tokenRequest = TokenRequest(
-        ChallengeName = challengeName,
-        ChallengeResponses = ChallengeResponses(creds.password, creds.username),
-        ClientId = creds.clientId,
-        ClientMetadata = ClientMetadata(creds.issuedForService),
-        Session = None
-      )
+    val tokenRequest = TokenRequest(
+      ChallengeName = challengeName,
+      ChallengeResponses = ChallengeResponses(creds.password, creds.username),
+      ClientId = creds.clientId,
+      ClientMetadata = ClientMetadata(creds.issuedForService),
+      Session = None
+    )
 
-      for {
-        authResponse <- getAuthResponse(authRequestEncoder.toEntity(authRequest))
-        updatedTokenReq = tokenRequest.copy(Session = Some(authResponse.Session))
-        tokenResponse <- getTokenResponse(tokenRequestEncoder.toEntity(updatedTokenReq))
-      } yield tokenResponse.AuthenticationResult
-    }
+    for {
+      authResponse <- getAuthResponse(authRequestEncoder.toEntity(authRequest))(client)
+      updatedTokenReq = tokenRequest.copy(Session = Some(authResponse.Session))
+      tokenResponse <- getTokenResponse(tokenRequestEncoder.toEntity(updatedTokenReq))(client)
+    } yield tokenResponse.AuthenticationResult
+  }
 
 }
