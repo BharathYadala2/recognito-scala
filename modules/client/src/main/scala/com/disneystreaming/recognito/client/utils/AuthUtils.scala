@@ -7,16 +7,18 @@ import io.circe.generic.auto._
 import org.http4s.circe._
 import org.http4s.client.Client
 import org.http4s.syntax.all._
-import org.http4s.{Entity, Headers, Method, Request}
+import org.http4s.{Entity, Headers, Method, Request, Uri}
 
 object AuthUtils {
 
-  private val cognitoUrl = uri"https://cognito-idp.us-east-1.amazonaws.com"
   private val authflow = "CUSTOM_AUTH"
   private val challengeName = "CUSTOM_CHALLENGE"
 
   private val authRequestEncoder = jsonEncoderOf[IO, AuthRequest]
   private val tokenRequestEncoder = jsonEncoderOf[IO, TokenRequest]
+
+  private def getCognitoUri(region: String): Uri =
+    uri"https://cognito-idp.$region.amazonaws.com"
 
   private val authResponseHeader: Headers =
     Headers(
@@ -30,10 +32,10 @@ object AuthUtils {
       "Content-Type" -> "application/x-amz-json-1.1"
     )
 
-  private def getAuthResponse(authRequest: Entity[IO])(client: Client[IO]): IO[AuthResponse] = {
+  private def getAuthResponse(authRequest: Entity[IO], uri: Uri)(client: Client[IO]): IO[AuthResponse] = {
     val request = Request[IO](
       method = Method.POST,
-      uri = cognitoUrl,
+      uri = uri,
       body = authRequest.body,
       headers = authResponseHeader
     )
@@ -41,10 +43,10 @@ object AuthUtils {
     client.expect(request)(jsonOf[IO, AuthResponse])
   }
 
-  private def getTokenResponse(tokenRequest: Entity[IO])(client: Client[IO]): IO[TokenResponse] = {
+  private def getTokenResponse(tokenRequest: Entity[IO], uri: Uri)(client: Client[IO]): IO[TokenResponse] = {
     val request = Request[IO](
       method = Method.POST,
-      uri = cognitoUrl,
+      uri = uri,
       body = tokenRequest.body,
       headers = tokenResponseHeader
     )
@@ -52,25 +54,27 @@ object AuthUtils {
     client.expect(request)(jsonOf[IO, TokenResponse])
   }
 
-  def generateToken(creds: RecognitoCredentials)(client: Client[IO]): IO[AuthenticationResult] = {
+  def generateToken(credentials: RecognitoCredentials)(client: Client[IO]): IO[AuthenticationResult] = {
+    val cognitoUri = getCognitoUri(credentials.region)
+
     val authRequest = AuthRequest(
-      AuthParameters = AuthParameters(creds.username),
+      AuthParameters = AuthParameters(credentials.username),
       AuthFlow = authflow,
-      ClientId = creds.clientId
+      ClientId = credentials.clientId
     )
 
     val tokenRequest = TokenRequest(
       ChallengeName = challengeName,
-      ChallengeResponses = ChallengeResponses(creds.password, creds.username),
-      ClientId = creds.clientId,
-      ClientMetadata = ClientMetadata(creds.issuedForService),
+      ChallengeResponses = ChallengeResponses(credentials.password, credentials.username),
+      ClientId = credentials.clientId,
+      ClientMetadata = ClientMetadata(credentials.issuedForService),
       Session = None
     )
 
     for {
-      authResponse <- getAuthResponse(authRequestEncoder.toEntity(authRequest))(client)
+      authResponse <- getAuthResponse(authRequestEncoder.toEntity(authRequest), cognitoUri)(client)
       updatedTokenReq = tokenRequest.copy(Session = Some(authResponse.Session))
-      tokenResponse <- getTokenResponse(tokenRequestEncoder.toEntity(updatedTokenReq))(client)
+      tokenResponse <- getTokenResponse(tokenRequestEncoder.toEntity(updatedTokenReq), cognitoUri)(client)
     } yield tokenResponse.AuthenticationResult
   }
 

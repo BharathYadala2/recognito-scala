@@ -15,14 +15,15 @@ object ApiUsage extends App {
   private val clientId = "538gsfq2es360re9bldpcspm57" // *
   private val username = "recognitosamplejava-6286e09dbb07d2d2cab2c1c9" // *
 
-  val creds1 = RecognitoCredentials(clientId, username, challengeAnswer, issuedForService)
+  val creds1 = RecognitoCredentials(clientId, username, challengeAnswer, issuedForService, region = "us-east-1")
 
 
   val creds2 = RecognitoCredentials(
     clientId = "538gsfq2es360re9bldpcspm57",
     username = "recognitosamplepython-6286baaa4339ad0f834b8955",
     password = "ozEshAQn7tfhb6fL",
-    issuedForService = "6286e09dbb07d2d2cab2c1c9"
+    issuedForService = "6286e09dbb07d2d2cab2c1c9",
+    region = "us-east-1"
   )
 
   val request: Request[IO] = Request(
