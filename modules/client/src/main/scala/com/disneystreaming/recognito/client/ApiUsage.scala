@@ -1,11 +1,13 @@
 package com.disneystreaming.recognito.client
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.effect.unsafe.implicits.global
 import com.disneystreaming.recognito.client.models.RecognitoCredentials
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits._
 import org.http4s.{Method, Request}
+import com.disneystreaming.recognito.client.middleware.AuthMiddleware
+import org.http4s.client.Client
 
 object ApiUsage extends App {
 
@@ -29,29 +31,12 @@ object ApiUsage extends App {
     uri = uri"https://google.com"
   )
 
-  import com.disneystreaming.recognito.client.middleware.AuthMiddleware
+  val program = for {
+    client <- EmberClientBuilder.default[IO].build
+    authorizedClient = AuthMiddleware(creds1)(client)
+    response <- authorizedClient.run(request)
+  } yield response
 
-  val program = EmberClientBuilder
-    .default[IO]
-    .build
-    .use { client =>
-      AuthMiddleware(creds1)(client).map { middleware =>
-        for {
-          req1 <- middleware.appendTo(request)
-          req2 <- middleware.appendTo(request)
-        } yield {
-          val header_v1 = req1.headers
-          val header_v2 = req2.headers
-
-          println(s"Request 1 header: $header_v1")
-          println(s"Request 2 header: $header_v2")
-
-          println(s"Request 1 header == Request 2 header: ${header_v1 == header_v2}")
-        }
-      }
-    }
-    .flatten
-
-  program.unsafeRunSync()
+  println(program.use(res => IO(res.status)).unsafeRunSync())
 
 }
