@@ -34,9 +34,13 @@ object ApiUsage extends App {
   val program = for {
     client <- EmberClientBuilder.default[IO].build
     authorizedClient = AuthMiddleware(creds1)(client)
-    response <- authorizedClient.run(request)
-  } yield response
+    response1 <- authorizedClient.run(request)
+    response2 <- authorizedClient.run(request)
+  } yield (response1, response2)
 
-  println(program.use(res => IO(res.status)).unsafeRunSync())
+  val (res1, res2) = program.use(res => IO(res)).unsafeRunSync()
+
+  println(s"Response 1 status: ${res1.status}")
+  println(s"Response 2 status: ${res2.status}")
 
 }
